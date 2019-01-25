@@ -1,0 +1,31 @@
+sudo: required
+services:
+  -docker
+
+before_install:
+  # Build the test images
+  # We need to create the dev image because it has all the code necessary for our tests
+  - docker build -t alejotem11/react-test -f ./client/Dockerfile.dev ./client
+
+# Primary test running section
+# If any of the scripts that we add inside exit with the status code other than zero then Travis CI is going to assume that our build failed
+# We only have tests for the react project (client), but you could easily add tests for server and worker
+script:
+  # By default npm test enters watch mode, which means it's never going to exit
+  # To make sure npm test eventually exits add [-- --coverage]
+  - docker run alejotem11/react-test npm test -- --coverage
+
+after_success:
+  # Build the production images
+  - docker build -t alejotem11/multi-client ./client
+  - docker build -t alejotem11/multi-nginx ./nginx
+  - docker build -t alejotem11/multi-server ./server
+  - docker build -t alejotem11/multi-worker ./worker
+  # Log in to the docker CLI
+  # NOTE: Create the environment variables DOCKER_ID and DOCKER_PASSWORD on travis CI
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # Push the production images to Docker Hub
+  - docker push alejotem11/multi-client
+  - docker push alejotem11/multi-nginx
+  - docker push alejotem11/multi-server
+  - docker push alejotem11/multi-worker
